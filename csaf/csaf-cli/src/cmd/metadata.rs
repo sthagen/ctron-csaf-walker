@@ -47,13 +47,13 @@ impl Metadata {
         Self::show_approach(
             "/.well-known/security.txt",
             &metadata
-                .approach_security_txt(&fetcher, "/.well-known/security.txt")
+                .approach_security_txt(&fetcher, ".well-known/security.txt")
                 .await,
         )?;
         Self::show_approach(
             "/security.txt",
             &metadata
-                .approach_security_txt(&fetcher, "/security.txt")
+                .approach_security_txt(&fetcher, "security.txt")
                 .await,
         )?;
         Self::show_approach("DNS", &metadata.approach_dns(&fetcher).await)?;
