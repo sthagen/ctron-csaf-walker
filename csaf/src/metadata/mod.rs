@@ -84,6 +84,10 @@ impl MetadataRetriever {
             .filter_map(|ext| Url::parse(&ext.value).ok())
             .find(|url| url.scheme() == "https");
 
+        if url.is_none() {
+            log::info!("No CSAF information is existing security.txt");
+        }
+
         Ok(url)
     }
 

@@ -132,6 +132,8 @@ impl Fetcher {
     ) -> Result<D::Type, Error> {
         let response = self.new_request(Method::GET, url).await?.send().await?;
 
+        log::debug!("Response Status: {}", response.status());
+
         Ok(processor.process(response).await?)
     }
 }
