@@ -25,7 +25,7 @@ pub enum Sbom {
     #[cfg(feature = "cyclonedx-bom")]
     #[deprecated(
         since = "0.12.0",
-        note = "Replaced with serde_cyclondex and the SerdeCycloneDx variant"
+        note = "Replaced with serde_cyclonedx and the SerdeCycloneDx variant"
     )]
     CycloneDx(cyclonedx_bom::prelude::Bom),
     #[cfg(feature = "serde-cyclonedx")]
