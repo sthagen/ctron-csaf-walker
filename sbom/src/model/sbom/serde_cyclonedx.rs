@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::large_enum_variant)]
@@ -34,13 +35,22 @@ impl<'de> Deserialize<'de> for Sbom<'static> {
 }
 
 macro_rules! attribute {
-    ($name:ident => | $v:ident -> $ret:ty | $access:expr  ) => {
+    ($name:ident ref => | $v:ident -> $ret:ty | $access:expr) => {
+        pub fn $name(&'a self) -> $ret {
+            attribute!(@impl self, $v, $access)
+        }
+    };
+    ($name:ident => | $v:ident -> $ret:ty | $access:expr) => {
         pub fn $name(&self) -> $ret {
-            match self {
-                Self::V1_4($v) => $access,
-                Self::V1_5($v) => $access,
-                Self::V1_6($v) => $access,
-            }
+            attribute!(@impl self, $v, $access)
+        }
+    };
+
+    (@impl $self:ident, $v:ident, $access:expr) => {
+        match $self {
+            Self::V1_4($v) => $access,
+            Self::V1_5($v) => $access,
+            Self::V1_6($v) => $access,
         }
     };
 }
@@ -67,23 +77,81 @@ macro_rules! from {
     };
 }
 
-impl Sbom<'_> {
-    attribute!(metadata => |sbom -> Option<Metadata> | sbom.metadata.as_ref().map(Into::into));
+macro_rules! r#type {
+    ($name:ident) => {
+        #[derive(Copy, Clone, Debug, PartialEq)]
+        pub enum $name<'a> {
+            V1_4(&'a serde_cyclonedx::cyclonedx::v_1_4::$name),
+            V1_5(&'a serde_cyclonedx::cyclonedx::v_1_5::$name),
+            V1_6(&'a serde_cyclonedx::cyclonedx::v_1_6::$name),
+        }
+    };
+}
 
-    attribute!(components => |sbom -> Option<Vec<Component>> | sbom
+/// Collect `bom-ref`s, recursing into sub-element
+pub trait BomRefCollection<'a> {
+    fn bom_refs_to(&self, refs: &mut HashMap<&'a str, usize>);
+
+    fn bom_refs(&self) -> HashMap<&'a str, usize> {
+        let mut result = HashMap::new();
+        self.bom_refs_to(&mut result);
+        result
+    }
+}
+
+macro_rules! bom_refs {
+    ($name:ident -> | $v:ident | $access:expr ) => {
+        impl<'a> BomRefCollection<'a> for $name<'a> {
+            fn bom_refs_to(&self, refs: &mut HashMap<&'a str, usize>) {
+                if let Some(r#ref) = self.bom_ref() {
+                    *refs.entry(r#ref).or_default() += 1;
+                }
+
+                let $v = self;
+
+                for child in ($access).into_iter().flatten() {
+                    child.bom_refs_to(refs);
+                }
+            }
+        }
+    };
+}
+
+impl<'a> Sbom<'a> {
+    attribute!(metadata ref => |sbom -> Option<Metadata<'a>> | sbom.metadata.as_ref().map(Metadata::from));
+
+    attribute!(components ref => |sbom -> Option<Vec<Component<'a>>> | sbom
                 .components
                 .as_ref()
                 .map(|c| c.iter().map(Into::into).collect()));
 
-    attribute!(services => |sbom -> Option<Vec<Service>> | sbom
+    attribute!(services ref => |sbom -> Option<Vec<Service<'a>>> | sbom
                 .services
                 .as_ref()
                 .map(|c| c.iter().map(Into::into).collect()));
 
-    attribute!(dependencies => |sbom -> Option<Vec<Dependency>> | sbom
+    attribute!(dependencies ref => |sbom -> Option<Vec<Dependency<'a>>> | sbom
                 .dependencies
                 .as_ref()
                 .map(|c| c.iter().map(Into::into).collect()));
+
+    pub fn bom_refs(&self) -> HashMap<&str, usize> {
+        let mut refs = HashMap::new();
+
+        if let Some(metadata) = self.metadata() {
+            metadata.bom_refs_to(&mut refs);
+        }
+
+        for component in self.components().into_iter().flatten() {
+            component.bom_refs_to(&mut refs);
+        }
+
+        for service in self.services().into_iter().flatten() {
+            service.bom_refs_to(&mut refs);
+        }
+
+        refs
+    }
 }
 
 impl From<serde_cyclonedx::cyclonedx::v_1_4::CycloneDx> for Sbom<'static> {
@@ -124,58 +192,46 @@ impl<'a> From<&'a serde_cyclonedx::cyclonedx::v_1_6::CycloneDx> for Sbom<'a> {
 
 // metadata
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Metadata<'a> {
-    V1_4(&'a serde_cyclonedx::cyclonedx::v_1_4::Metadata),
-    V1_5(&'a serde_cyclonedx::cyclonedx::v_1_5::Metadata),
-    V1_6(&'a serde_cyclonedx::cyclonedx::v_1_6::Metadata),
-}
-
+r#type!(Metadata);
 from!('a, Metadata,  Metadata<'a>);
 
 impl<'a> Metadata<'a> {
     attribute!(component => |c -> Option<Component<'a>> | c.component.as_ref().map(Into::into));
 }
 
-// component
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Component<'a> {
-    V1_4(&'a serde_cyclonedx::cyclonedx::v_1_4::Component),
-    V1_5(&'a serde_cyclonedx::cyclonedx::v_1_5::Component),
-    V1_6(&'a serde_cyclonedx::cyclonedx::v_1_6::Component),
+impl<'a> BomRefCollection<'a> for Metadata<'a> {
+    fn bom_refs_to(&self, refs: &mut HashMap<&'a str, usize>) {
+        if let Some(component) = self.component() {
+            component.bom_refs_to(refs);
+        }
+    }
 }
 
+// component
+
+r#type!(Component);
 from!('a, Component,  Component<'a>);
+bom_refs!(Component -> |c| c.components());
 
 impl<'a> Component<'a> {
     attribute!(bom_ref => |c -> Option<&'a str> | c.bom_ref.as_deref());
+    attribute!(components => |c -> Option<Vec<Component<'a>>> | c.components.as_ref().map(|c| c.iter().map(Into::into).collect()));
 }
 
 // service
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Service<'a> {
-    V1_4(&'a serde_cyclonedx::cyclonedx::v_1_4::Service),
-    V1_5(&'a serde_cyclonedx::cyclonedx::v_1_5::Service),
-    V1_6(&'a serde_cyclonedx::cyclonedx::v_1_6::Service),
-}
-
+r#type!(Service);
 from!('a, Service,  Service<'a>);
+bom_refs!(Service -> |c| c.services());
 
 impl<'a> Service<'a> {
-    attribute!(bom_ref => |c -> Option<&'a str> | c.bom_ref.as_deref());
+    attribute!(bom_ref => |s -> Option<&'a str> | s.bom_ref.as_deref());
+    attribute!(services => |s -> Option<Vec<Service<'a>>> | s.services.as_ref().map(|s| s.iter().map(Into::into).collect()));
 }
 
 // dependency
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Dependency<'a> {
-    V1_4(&'a serde_cyclonedx::cyclonedx::v_1_4::Dependency),
-    V1_5(&'a serde_cyclonedx::cyclonedx::v_1_5::Dependency),
-    V1_6(&'a serde_cyclonedx::cyclonedx::v_1_6::Dependency),
-}
-
+r#type!(Dependency);
 from!('a, Dependency,  Dependency<'a>);
 
 impl Dependency<'_> {
