@@ -14,6 +14,7 @@ use sha2::{Sha256, Sha512};
 use std::{sync::Arc, time::SystemTime};
 use time::{OffsetDateTime, format_description::well_known::Rfc2822};
 use url::{ParseError, Url};
+use walker_common::utils::url::ensure_slash;
 use walker_common::{
     changes::{self, ChangeEntry, ChangeSource},
     fetcher::{self, DataProcessor, Fetcher},
@@ -117,23 +118,15 @@ impl Source for HttpSource {
 
         match discover_context.as_ref() {
             DistributionContext::Directory(base) => {
-                let has_slash = base.to_string().ends_with('/');
-
-                let join_url = |mut s: &str| {
-                    if has_slash && s.ends_with('/') {
-                        s = &s[1..];
-                    }
-                    Url::parse(&format!("{base}{s}"))
-                };
-
-                let changes = ChangeSource::retrieve(&self.fetcher, &base.clone()).await?;
+                let base = ensure_slash(base.clone());
+                let changes = ChangeSource::retrieve(&self.fetcher, &base).await?;
 
                 Ok(changes
                     .entries
                     .into_iter()
                     .map(|ChangeEntry { file, timestamp }| {
                         let modified = timestamp.into();
-                        let url = join_url(&file)?;
+                        let url = base.join(&file)?;
 
                         Ok::<_, ParseError>(DiscoveredAdvisory {
                             context: discover_context.clone(),

@@ -45,3 +45,13 @@ where
         }
     }
 }
+
+/// Ensure that the path has a trailing slash
+pub fn ensure_slash(mut url: Url) -> Url {
+    if !url.path().ends_with("/") {
+        let new_path = format!("{}/", url.path());
+        url.set_path(&new_path);
+    }
+
+    url
+}
