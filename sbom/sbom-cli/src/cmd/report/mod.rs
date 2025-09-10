@@ -4,10 +4,9 @@ use crate::{cmd::DiscoverArguments, common::walk_visitor, inspect::inspect};
 use parking_lot::Mutex;
 use reqwest::Url;
 use sbom_walker::{
-    model::sbom::ParseAnyError,
     report::ReportResult,
     retrieve::RetrievingVisitor,
-    source::{DispatchSource, Source},
+    source::DispatchSource,
     validation::{ValidatedSbom, ValidationVisitor},
 };
 use std::{
@@ -29,14 +28,6 @@ use walker_common::{
     utils::url::Urlify,
     validate::{ValidationError, ValidationOptions},
 };
-
-#[derive(Debug, thiserror::Error)]
-pub enum SbomError<S: Source> {
-    #[error(transparent)]
-    Validation(#[from] ValidationError<S>),
-    #[error(transparent)]
-    Parse(#[from] ParseAnyError),
-}
 
 /// Analyze (and report) the state of the data.
 #[derive(clap::Args, Debug)]
