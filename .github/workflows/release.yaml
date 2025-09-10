@@ -32,27 +32,29 @@ jobs:
           - x86_64-pc-windows-msvc
         include:
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04
-            cross: "true"
-            args: --features vendored,crypto-openssl,walker-common/liblzma,csaf --no-default-features
+            os: ubuntu-22.04-arm
+            install: sudo apt install clang llvm pkg-config nettle-dev
+            args: --features crypto-openssl,walker-common/liblzma,csaf --no-default-features
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
             install: sudo apt install clang llvm pkg-config nettle-dev
             args: --features crypto-openssl,walker-common/liblzma,csaf --no-default-features
+
           - target: aarch64-unknown-linux-musl
-            os: ubuntu-22.04
-            cross: "true"
+            os: ubuntu-22.04-arm
             args: --features vendored,crypto-openssl,walker-common/liblzma,csaf --no-default-features
           - target: x86_64-unknown-linux-musl
             os: ubuntu-22.04
             install: sudo apt install clang llvm pkg-config libssl-dev nettle-dev musl-tools
             args: --features vendored,crypto-openssl,walker-common/liblzma,csaf --no-default-features
+
           - target: x86_64-apple-darwin
             os: macos-13
             args: --features vendored,crypto-openssl,walker-common/liblzma,csaf --no-default-features
           - target: aarch64-apple-darwin
             os: macos-14
             args: --features vendored,crypto-openssl,walker-common/liblzma,csaf --no-default-features
+
           - target: x86_64-pc-windows-msvc
             os: windows-2022
             exe: ".exe"
@@ -97,14 +99,6 @@ jobs:
         run: |
           Set-ExecutionPolicy Unrestricted -Scope Process; iex (iwr "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.ps1").Content
 
-      - name: Prepare cross
-        if: matrix.cross == 'true'
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cargo binstall cross -y
-
       - name: Install cargo-cyclonedx
         shell: bash
         env:
@@ -129,10 +123,6 @@ jobs:
           OPTS="$OPTS ${{ matrix.args }}"
           
           CMD="cargo"
-          
-          if [[ -n "${{ matrix.cross }}" ]]; then
-            CMD="cross"
-          fi
           
           env NETTLE_STATIC=yes ${CMD} build ${OPTS}
 
