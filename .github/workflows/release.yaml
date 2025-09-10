@@ -42,6 +42,7 @@ jobs:
 
           - target: aarch64-unknown-linux-musl
             os: ubuntu-22.04-arm
+            install: sudo apt install clang llvm pkg-config libssl-dev nettle-dev musl-tools
             args: --features vendored,crypto-openssl,walker-common/liblzma,csaf --no-default-features
           - target: x86_64-unknown-linux-musl
             os: ubuntu-22.04
