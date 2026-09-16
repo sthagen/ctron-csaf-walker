@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write # for creating a release
-  id-token: write # for attestations
+  id-token: write # for attestations and crates.io trusted publishing
   attestations: write # for attestations
 
 jobs:
@@ -234,5 +234,6 @@ jobs:
     uses: scm-rs/shared-workflows/.github/workflows/release.yaml@main
     with:
       copy_staging: "~/download/*/csaf-* ~/download/*/sbom-*"
-    secrets:
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    # no CARGO_REGISTRY_TOKEN: publishing to crates.io uses trusted publishing
+    # (OIDC) via the "release" environment. Passing the token would take
+    # precedence in the shared workflow and bypass it.
