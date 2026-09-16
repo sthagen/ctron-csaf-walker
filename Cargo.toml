@@ -85,5 +85,4 @@ tag = false
 tag-name = "v{{version}}"
 
 [patch.crates-io]
-#csaf = { git = "https://github.com/ctron/csaf-rs", rev = "0bbc262c76c50f7ec918e65d1cf9bf4c5dd564d7" }
 #cyclonedx-bom = { path = "../cyclonedx-rust-cargo/cyclonedx-bom" }
